@@ -2,11 +2,12 @@
 By Jackie Nguyen
 github: https://github.com/aznone5
 linkedin: https://www.linkedin.com/in/jackie-dan-nguyen/
+Tableau: https://public.tableau.com/app/profile/jackie.nguyen12
 Dataset download https://archive.ics.uci.edu/dataset/502/online+retail+ii
 
 TASK
 Focus on aggerating data to find out ways to improve the buisness by the sales, cusotmer buying habbits, how much they usually like to spend
-what country are they from, etc.
+what country are they from, and who contributes to the sales of the retail store.
 */
 
 -- Create the table to import the dataset
@@ -24,23 +25,27 @@ CREATE TABLE retail (
 );
 
 
--- This dataset has 500,000 rows, in jupyter notebooks, founded on the .ipynb file,  I decided to shorten the dataset and used a randomly selected 30,000 rows instead.
+-- This dataset has 525,461 rows, in jupyter notebooks, founded on the .ipynb file,  I decided to shorten the dataset and used a randomly selected 30,000 rows instead.
 SET SQL_SAFE_UPDATES = 0;
 
 
 -- count all 30,000 rows
 select count(*) from retail;
+
 SELECT 
     *
 FROM
     retail;
-
+    
+select country, count(country)
+from retail
+group by Country
+order by count(country) desc;
 
 -- A negative quanity amount doesn't make sense.  Therefore, let's edit it out.
 DELETE FROM retail 
 WHERE
     Quantity < 0;
-
 
 -- Monthly sales from each month
 SELECT 
@@ -68,6 +73,20 @@ SELECT
     STDDEV(UnitPrice) AS stddev_unitprice
 FROM
     retail;
+-- product profits    
+SELECT description, COUNT(description) AS description_count, UnitPrice, SUM(quantity) AS total_quantity,
+UnitPrice * SUM(quantity) as Profit
+FROM retail
+GROUP BY description, UnitPrice
+ORDER BY description_count DESC
+limit 30;
+
+SELECT description, COUNT(description) AS description_count, UnitPrice, SUM(quantity) AS total_quantity,
+UnitPrice * SUM(quantity) as Profit
+FROM retail
+GROUP BY description, UnitPrice
+ORDER BY profit DESC
+limit 30;
 
 -- Total profit per month
 SELECT 
@@ -169,7 +188,8 @@ HAVING
     or month = 12)
 ORDER BY total_quantity DESC;
 
--- Joining all three tables
+-- Joining all three tables and saving it as joined_2.csv for tableau and online_retail_edited.csv for jupyter notebooks
+-- Now after completing the sql aggergations for Tableau, we will continue with part 2 on juypter notebooks, Machine learning.
 SELECT 
     A.CustomerID,
     A.num_purchases,
@@ -209,5 +229,44 @@ FROM
     WHERE
         CustomerID IS NOT NULL
     GROUP BY CustomerID) AS c ON a.CustomerID = C.CustomerID
-ORDER BY B.total_spending DESC
-LIMIT 100;
+ORDER BY A.num_purchases DESC
+LIMIT 300;
+
+SELECT 
+    A.CustomerID,
+    A.num_purchases,
+    B.total_spending,
+    B.customer_segment,
+    round(b.total_spending / a.num_purchases, 2) as avg_price_per_item
+FROM
+    (SELECT 
+        CustomerID, COUNT(DISTINCT InvoiceNo) AS num_purchases
+    FROM
+        retail
+    WHERE
+        CustomerID IS NOT NULL
+    GROUP BY CustomerID) AS a
+        JOIN
+    (SELECT 
+        CustomerID,
+            SUM(Quantity * UnitPrice) AS total_spending,
+            CASE
+                WHEN SUM(Quantity * UnitPrice) < 100 THEN 'Low Spender'
+                WHEN SUM(Quantity * UnitPrice) BETWEEN 100 AND 500 THEN 'Medium Spender'
+                ELSE 'High Spender'
+            END AS customer_segment
+    FROM
+        retail
+    WHERE
+        CustomerID IS NOT NULL
+    GROUP BY CustomerID) AS b ON a.CustomerID = b.CustomerID
+        JOIN
+    (SELECT 
+        CustomerID,
+            ROUND(AVG(Quantity * UnitPrice), 2) AS avg_spending,
+            ROUND(AVG(Quantity * UnitPrice), 2) * 24 AS estimated_lifetime_value
+    FROM
+        retail
+    WHERE
+        CustomerID IS NOT NULL
+    GROUP BY CustomerID) AS c ON a.CustomerID = C.CustomerID
